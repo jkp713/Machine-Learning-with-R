@@ -1,0 +1,239 @@
+---
+title: "ML"
+output:
+  html_document: default
+  pdf_document: default
+date: "2022-11-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r include=FALSE}
+
+
+#install.packages("caret", dependencies=c("Depends", "Suggests"))
+#install.packages("glue")
+library(ggplot2)
+library(caret)
+```
+
+## Load data
+We will use İris dataset which is already built in R, and is about flowers
+```{r}
+data(iris)
+
+dataset <- iris
+```
+
+Split data to train and test (validation)
+```{r}
+# create a list of 80% of the row indees in the original dataset we can use for training
+validation_index <- createDataPartition(dataset$Species, p=0.80, list=FALSE)
+# select 20% of the data for validation
+validation <- dataset[-validation_index,]
+# use the remaining 80% of data to training and testing the models
+dataset <- dataset[validation_index,]
+```
+
+a little summary of the data
+
+dimensions
+```{r}
+dim(dataset)
+```
+
+Types of each variable
+```{r}
+sapply(dataset, class)
+```
+
+how the data looks like 
+```{r}
+head(dataset)
+```
+
+as species is factor, lets take a look at its levels
+
+```{r}
+levels(dataset$Species)
+```
+
+so we see a multi class data, not binary
+
+lets take a look at the class distribution of each classes
+
+```{r}
+#percantage of each class
+percentage <- prop.table(table(dataset$Species)) * 100
+
+
+cbind(freq=table(dataset$Species), percentage=percentage)
+
+#table(dataset$Species)
+#this gives us frequencies of each unique value in dataset$species
+
+#prop.table(table(dataset$Species))
+#prop table gives us proportion of each values in a table, in that case, 
+#its output sums to one like:
+#> prop.table(table(dataset$Species))
+
+#    setosa versicolor  virginica 
+#0.3333333  0.3333333  0.3333333 
+
+#for that reason we multiplied the value by 100
+```
+so we see that each class is represented equally
+
+Statistical summary of the dataset
+```{r}
+summary(dataset)
+```
+
+Lets make some visualization
+
+Univariate (one variable) plots
+
+```{r}
+#independent variables to x
+x <- dataset[,1:4]
+
+#dependent variable to y
+y <- dataset[,5]
+```
+
+lets see the distribituon of independent variables
+
+```{r}
+#this is for setting the number of boxplots
+par(mfrow=c(1,4))
+  for(i in 1:4) {
+  boxplot(x[,i], main=names(iris)[i])
+  }
+#gvisualization of each 4 variable with for loop
+#took the names of each boxplot from iris object which is already defined
+```
+we have the dependent variable as y so lets see its distribution of its different
+classes
+
+```{r}
+plot(y)
+```
+they are equal as we have seen earlier
+
+# Multivariate Plots (relationship of variables btw each other)
+
+ScatterplotMatrix
+```{r}
+featurePlot(x=x, y=y, plot="ellipse")
+```
+
+Distribution of each variable with density plot
+
+```{r}
+
+# density plots for each attribute by class value
+scales <- list(x=list(relation="free"), y=list(relation="free"))
+featurePlot(x=x, y=y, plot="density", scales=scales)
+```
+this gave us distribution of attributes for each 3 different classes
+
+# Making Predictions with 5 different models and evaluating them
+
+We will use 10 fold cross validation and use accuracy as metric
+
+```{r}
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+```
+
+We will build and make prediction with five different models which are:
+
+Linear Discriminant Analysis (LDA)
+Classification and Regression Trees (CART).
+k-Nearest Neighbors (kNN).
+Support Vector Machines (SVM) with a linear kernel.
+Random Forest (RF)
+
+```{r}
+
+# a) linear algorithms
+set.seed(7)
+fit.lda <- train(Species~., data=dataset, method="lda", metric=metric, trControl=control)
+# b) nonlinear algorithms
+# CART
+set.seed(7)
+fit.cart <- train(Species~., data=dataset, method="rpart", metric=metric, trControl=control)
+# kNN
+set.seed(7)
+fit.knn <- train(Species~., data=dataset, method="knn", metric=metric, trControl=control)
+# c) advanced algorithms
+# SVM
+set.seed(7)
+fit.svm <- train(Species~., data=dataset, method="svmRadial", metric=metric, trControl=control)
+# Random Forest
+set.seed(7)
+fit.rf <- train(Species~., data=dataset, method="rf", metric=metric, trControl=control)
+```
+
+
+Getting, summarizing and comparing results
+
+```{r}
+results <- resamples(list(lda=fit.lda, cart=fit.cart, knn=fit.knn, svm=fit.svm, rf=fit.rf))
+summary(results)
+```
+result shows us both accuracy metric results and another matric whic is kappa
+
+both metrics shows us that the most accurate model is LDA
+
+we can also visualize the result
+
+```{r}
+dotplot(results)
+```
+we can also see the result for only LDA
+```{r}
+print(fit.lda)
+```
+Now that we build the model, we can make predictions and test the results, thus
+we can see the accuracy of the model with our validation data set which our model 
+did not see and learn yet
+
+making prediction with lda and seeing its accuracy with confusion matrix
+```{r}
+predictions <- predict(fit.lda, validation)
+confusionMatrix(predictions, validation$Species)
+```
+
+lda model predictic every 30 cases in our validation data correctly
+
+İMPORTANT NOTE: caret library does not support model tuning and configuration, and we did not 
+tuned and configured our model here, we only built the model and made prediction
+
+Lastly, we can create a random observation and test it to see how we can predict the unseen 
+cases after we built the model
+
+Create new observation in the form of DataFrame
+```{r}
+Sepal.Length <- 4.1
+Sepal.Width <- 7.4
+Petal.Length <- 2.2
+Petal.Width <- 3.5
+
+test <- data.frame(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width)
+```
+
+
+Now that we created a test case, we can receive the prediction
+```{r}
+predictiontest <- predict(fit.lda, test)
+
+print(predictiontest)
+```
+
+As can be seen, the prediction our model gives us is setosa
+
